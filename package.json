@@ -1,15 +1,13 @@
 {
   "name": "mock-ai-api",
   "version": "1.0.0",
-  "description": "Mock AI API",
+  "type": "module",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
-    "express": "^5.2.1",
-    "node-fetch": "^3.3.2",
-    "openai": "^6.16.0"
+    "express": "^4.19.2"
   }
 }

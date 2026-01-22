@@ -1,49 +1,86 @@
-const express = require("express");
-const cors = require("cors");
+import express from "express";
+import cors from "cors";
 
 const app = express();
+const PORT = process.env.PORT || 3000;
+
+// ===== CONFIG =====
+const HF_API_KEY = process.env.HF_API_KEY;
+const HF_ENDPOINT = "https://router.huggingface.co/v1/chat/completions";
+const MODEL_NAME = "openai/gpt-oss-120b";
+
+// ===== MIDDLEWARE =====
 app.use(cors());
 app.use(express.json());
 
-// Hugging Face model
-const HF_MODEL = "facebook/blenderbot-400M-distill";
+// ===== HEALTH CHECK =====
+app.get("/", (req, res) => {
+  res.json({ status: "ok", service: "mock-ai-api" });
+});
 
+// ===== MAIN ENDPOINT =====
 app.post("/test-agent", async (req, res) => {
-  const { prompt, stream } = req.body;
-
   try {
-    const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
+    const { prompt, stream = false } = req.body;
+
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "prompt is required and must be a string"
+      });
+    }
+
+    const hfResponse = await fetch(HF_ENDPOINT, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.HF_API_KEY}`,
+        "Authorization": `Bearer ${HF_API_KEY}`,
         "Content-Type": "application/json"
       },
-      body: JSON.stringify({ inputs: prompt, options: { wait_for_model: true } })
+      body: JSON.stringify({
+        model: MODEL_NAME,
+        messages: [
+          { role: "user", content: prompt }
+        ],
+        stream: false
+      })
     });
 
-    const data = await response.json();
+    if (!hfResponse.ok) {
+      const errorText = await hfResponse.text();
+      console.error("HF API error:", errorText);
 
-    let textResponse = "Sorry, I couldn't generate a response.";
-
-    if (data && data[0] && data[0].generated_text) {
-      textResponse = data[0].generated_text;
+      return res.status(502).json({
+        requestId: Date.now().toString(),
+        prompt,
+        stream,
+        response: "Sorry, I couldn't generate a response right now."
+      });
     }
+
+    const data = await hfResponse.json();
+
+    const aiMessage =
+      data?.choices?.[0]?.message?.content ??
+      "Sorry, I couldn't generate a response.";
 
     res.json({
       requestId: Date.now().toString(),
       prompt,
       stream,
-      response: textResponse
+      response: aiMessage
     });
 
   } catch (err) {
-    console.error(err);
+    console.error("Server error:", err);
+
     res.status(500).json({
-      error: "Hugging Face API failed",
-      details: err.message
+      requestId: Date.now().toString(),
+      response: "Sorry, something went wrong on the server."
     });
   }
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Hugging Face AI API running on port ${PORT}`));
+// ===== START SERVER =====
+app.listen(PORT, () => {
+  console.log(`🚀 Mock AI API running on port ${PORT}`);
+});
