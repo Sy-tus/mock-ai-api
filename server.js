@@ -1,86 +1,56 @@
 import express from "express";
 import cors from "cors";
+import bodyParser from "body-parser";
+import OpenAI from "openai";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const port = process.env.PORT || 3000;
 
-// ===== CONFIG =====
-const HF_API_KEY = process.env.HF_API_KEY;
-const HF_ENDPOINT = "https://router.huggingface.co/v1/chat/completions";
-const MODEL_NAME = "openai/gpt-oss-120b";
-
-// ===== MIDDLEWARE =====
-app.use(cors());
-app.use(express.json());
-
-// ===== HEALTH CHECK =====
-app.get("/", (req, res) => {
-  res.json({ status: "ok", service: "mock-ai-api" });
+// Replace with your Hugging Face / OpenAI-compatible API key
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
 });
 
-// ===== MAIN ENDPOINT =====
+app.use(cors());
+app.use(bodyParser.json());
+
+// POST endpoint for AI agent
 app.post("/test-agent", async (req, res) => {
+  const { prompt, stream } = req.body;
+
+  if (!prompt) {
+    return res.status(400).json({ error: "Missing 'prompt' in request body." });
+  }
+
   try {
-    const { prompt, stream = false } = req.body;
+    // Prepend instruction for short replies
+    const shortPrompt = `Answer briefly in 3-4 sentences, suitable for beginners:\n${prompt}`;
 
-    if (!prompt || typeof prompt !== "string") {
-      return res.status(400).json({
-        error: "Invalid request",
-        message: "prompt is required and must be a string"
-      });
-    }
-
-    const hfResponse = await fetch(HF_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${HF_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: MODEL_NAME,
-        messages: [
-          { role: "user", content: prompt }
-        ],
-        stream: false
-      })
+    const response = await client.chat.completions.create({
+      model: "openai/gpt-oss-120b", // or whichever model you use
+      messages: [{ role: "user", content: shortPrompt }],
+      max_tokens: 150, // limit reply length
+      temperature: 0.7,
     });
 
-    if (!hfResponse.ok) {
-      const errorText = await hfResponse.text();
-      console.error("HF API error:", errorText);
-
-      return res.status(502).json({
-        requestId: Date.now().toString(),
-        prompt,
-        stream,
-        response: "Sorry, I couldn't generate a response right now."
-      });
-    }
-
-    const data = await hfResponse.json();
-
-    const aiMessage =
-      data?.choices?.[0]?.message?.content ??
-      "Sorry, I couldn't generate a response.";
+    const answer = response.choices[0].message.content;
 
     res.json({
       requestId: Date.now().toString(),
       prompt,
-      stream,
-      response: aiMessage
+      stream: !!stream,
+      response: answer,
     });
-
-  } catch (err) {
-    console.error("Server error:", err);
-
+  } catch (error) {
+    console.error("AI request failed:", error);
     res.status(500).json({
-      requestId: Date.now().toString(),
-      response: "Sorry, something went wrong on the server."
+      error: "AI service failed",
+      details: error.message || error,
     });
   }
 });
 
-// ===== START SERVER =====
-app.listen(PORT, () => {
-  console.log(`🚀 Mock AI API running on port ${PORT}`);
+// Start server
+app.listen(port, () => {
+  console.log(`Server running on port ${port}`);
 });
