@@ -6,7 +6,7 @@ app.use(cors());
 app.use(express.json());
 
 // Hugging Face model
-const HF_MODEL = "gpt2";
+const HF_MODEL = "facebook/blenderbot-400M-distill";
 
 app.post("/test-agent", async (req, res) => {
   const { prompt, stream } = req.body;
