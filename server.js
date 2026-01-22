@@ -1,19 +1,17 @@
 const express = require("express");
 const cors = require("cors");
-const fetch = require("node-fetch"); // fetch for API calls
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Hugging Face model (you can swap models later)
-const HF_MODEL = "gpt2"; // simple text generation model
+// Hugging Face model
+const HF_MODEL = "gpt2";
 
 app.post("/test-agent", async (req, res) => {
   const { prompt, stream } = req.body;
 
   try {
-    // Call Hugging Face Inference API
     const response = await fetch(`https://api-inference.huggingface.co/models/${HF_MODEL}`, {
       method: "POST",
       headers: {
