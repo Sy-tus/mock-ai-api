@@ -30,26 +30,25 @@ app.post("/test-agent", async (req, res) => {
       });
     }
 
-    // Determine max_new_tokens based on requested length
-    let maxTokens;
+    // Decide system instruction based on requested length
     let systemInstruction;
 
     switch (length.toLowerCase()) {
       case "short":
-        maxTokens = 150;
-        systemInstruction = "You are a helpful assistant. Give short, concise answers in 2-3 sentences.";
+        systemInstruction =
+          "You are a helpful assistant. Provide short, concise answers in 2-3 sentences.";
         break;
       case "medium":
-        maxTokens = 300;
-        systemInstruction = "You are a helpful assistant. Give clear, medium-length answers in a short paragraph.";
+        systemInstruction =
+          "You are a helpful assistant. Provide clear, medium-length answers in a short paragraph.";
         break;
       case "long":
-        maxTokens = 1000;
-        systemInstruction = "You are a helpful assistant. Give detailed, thorough explanations with examples.";
+        systemInstruction =
+          "You are a helpful assistant. Provide detailed, thorough explanations with examples.";
         break;
       default:
-        maxTokens = 150;
-        systemInstruction = "You are a helpful assistant. Give short, concise answers in 2-3 sentences.";
+        systemInstruction =
+          "You are a helpful assistant. Provide short, concise answers in 2-3 sentences.";
     }
 
     const hfResponse = await fetch(HF_ENDPOINT, {
@@ -64,7 +63,6 @@ app.post("/test-agent", async (req, res) => {
           { role: "system", content: systemInstruction },
           { role: "user", content: prompt }
         ],
-        max_new_tokens: maxTokens,
         stream: false
       })
     });
@@ -93,7 +91,6 @@ app.post("/test-agent", async (req, res) => {
       stream,
       response: aiMessage
     });
-
   } catch (err) {
     console.error("Server error:", err);
 
