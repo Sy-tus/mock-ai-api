@@ -1,56 +1,65 @@
-import express from "express";
-import cors from "cors";
-import bodyParser from "body-parser";
-import OpenAI from "openai";
-
-const app = express();
-const port = process.env.PORT || 3000;
-
-// Replace with your Hugging Face / OpenAI-compatible API key
-const client = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
-app.use(cors());
-app.use(bodyParser.json());
-
-// POST endpoint for AI agent
 app.post("/test-agent", async (req, res) => {
-  const { prompt, stream } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: "Missing 'prompt' in request body." });
-  }
-
   try {
-    // Prepend instruction for short replies
-    const shortPrompt = `Answer briefly in 3-4 sentences, suitable for beginners:\n${prompt}`;
+    const { prompt, stream = false } = req.body;
 
-    const response = await client.chat.completions.create({
-      model: "openai/gpt-oss-120b", // or whichever model you use
-      messages: [{ role: "user", content: shortPrompt }],
-      max_tokens: 150, // limit reply length
-      temperature: 0.7,
+    if (!prompt || typeof prompt !== "string") {
+      return res.status(400).json({
+        error: "Invalid request",
+        message: "prompt is required and must be a string"
+      });
+    }
+
+    const hfResponse = await fetch(HF_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${HF_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: MODEL_NAME,
+        messages: [
+          {
+            role: "system",
+            content: "You are a helpful assistant. Give short, concise answers in 2-3 sentences."
+          },
+          { role: "user", content: prompt }
+        ],
+        max_new_tokens: 150,
+        stream: false
+      })
     });
 
-    const answer = response.choices[0].message.content;
+    if (!hfResponse.ok) {
+      const errorText = await hfResponse.text();
+      console.error("HF API error:", errorText);
+
+      return res.status(502).json({
+        requestId: Date.now().toString(),
+        prompt,
+        stream,
+        response: "Sorry, I couldn't generate a response right now."
+      });
+    }
+
+    const data = await hfResponse.json();
+
+    const aiMessage =
+      data?.choices?.[0]?.message?.content ??
+      "Sorry, I couldn't generate a response.";
 
     res.json({
       requestId: Date.now().toString(),
       prompt,
-      stream: !!stream,
-      response: answer,
+      stream,
+      response: aiMessage
     });
-  } catch (error) {
-    console.error("AI request failed:", error);
+
+  } catch (err) {
+    console.error("Server error:", err);
+
     res.status(500).json({
-      error: "AI service failed",
-      details: error.message || error,
+      requestId: Date.now().toString(),
+      response: "Sorry, something went wrong on the server."
     });
   }
-});
-
-// Start server
-app.listen(port, () => {
-  console.log(`Server running on port ${port}`);
 });
