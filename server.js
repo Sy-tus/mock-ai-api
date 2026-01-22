@@ -21,13 +21,35 @@ app.get("/", (req, res) => {
 // ===== MAIN ENDPOINT =====
 app.post("/test-agent", async (req, res) => {
   try {
-    const { prompt, stream = false } = req.body;
+    const { prompt, stream = false, length = "short" } = req.body;
 
     if (!prompt || typeof prompt !== "string") {
       return res.status(400).json({
         error: "Invalid request",
         message: "prompt is required and must be a string"
       });
+    }
+
+    // Determine max_new_tokens based on requested length
+    let maxTokens;
+    let systemInstruction;
+
+    switch (length.toLowerCase()) {
+      case "short":
+        maxTokens = 150;
+        systemInstruction = "You are a helpful assistant. Give short, concise answers in 2-3 sentences.";
+        break;
+      case "medium":
+        maxTokens = 300;
+        systemInstruction = "You are a helpful assistant. Give clear, medium-length answers in a short paragraph.";
+        break;
+      case "long":
+        maxTokens = 1000;
+        systemInstruction = "You are a helpful assistant. Give detailed, thorough explanations with examples.";
+        break;
+      default:
+        maxTokens = 150;
+        systemInstruction = "You are a helpful assistant. Give short, concise answers in 2-3 sentences.";
     }
 
     const hfResponse = await fetch(HF_ENDPOINT, {
@@ -39,8 +61,10 @@ app.post("/test-agent", async (req, res) => {
       body: JSON.stringify({
         model: MODEL_NAME,
         messages: [
+          { role: "system", content: systemInstruction },
           { role: "user", content: prompt }
         ],
+        max_new_tokens: maxTokens,
         stream: false
       })
     });
