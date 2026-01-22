@@ -1,35 +1,40 @@
-// server.js
-const express = require("express");
-const cors = require("cors");
-const app = express();
+import express from "express";
+import cors from "cors";
+import OpenAI from "openai";
 
+const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Predefined Q&A knowledge base
-const knowledgeBase = {
-  "whats the weather in mumbai?": "The weather in Mumbai is sunny today ☀️",
-  "whats the time in mumbai?": "The current time in Mumbai is 6:00 PM",
-  "hello": "Hello! How can I help you today?"
-};
-
-// POST endpoint
-app.post("/test-agent", (req, res) => {
-  const { prompt, stream } = req.body;
-  const lowerPrompt = prompt?.toLowerCase();
-
-  // Check if prompt exists in knowledge base
-  const responseText = knowledgeBase[lowerPrompt] || "Sorry, I don’t know the answer to that.";
-
-  // Respond with AI-like JSON
-  res.json({
-    requestId: Date.now().toString(),
-    prompt,
-    stream,
-    response: responseText
-  });
+const client = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY
 });
 
-// Start server
+app.post("/test-agent", async (req, res) => {
+  try {
+    const { prompt, stream } = req.body;
+
+    const completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: "You are a helpful assistant." },
+        { role: "user", content: prompt }
+      ]
+    });
+
+    res.json({
+      requestId: Date.now().toString(),
+      prompt,
+      stream,
+      response: completion.choices[0].message.content
+    });
+  } catch (error) {
+    res.status(500).json({
+      error: "AI service failed",
+      details: error.message
+    });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Mock AI API running on http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`AI API running on ${PORT}`));
