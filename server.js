@@ -1,6 +1,6 @@
-import express from "express";
-import cors from "cors";
-import OpenAI from "openai";
+const express = require("express");
+const cors = require("cors");
+const OpenAI = require("openai");
 
 const app = express();
 app.use(cors());
@@ -19,7 +19,9 @@ app.post("/test-agent", async (req, res) => {
       messages: [
         { role: "system", content: "You are a helpful assistant." },
         { role: "user", content: prompt }
-      ]
+      ],
+      max_tokens: 200,
+      temperature: 0.7
     });
 
     res.json({
@@ -28,13 +30,13 @@ app.post("/test-agent", async (req, res) => {
       stream,
       response: completion.choices[0].message.content
     });
-  } catch (error) {
+  } catch (err) {
     res.status(500).json({
       error: "AI service failed",
-      details: error.message
+      details: err.message
     });
   }
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`AI API running on ${PORT}`));
+app.listen(PORT, () => console.log(`AI API running on port ${PORT}`));
