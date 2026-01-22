@@ -1,3 +1,24 @@
+import express from "express";
+import cors from "cors";
+
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// ===== CONFIG =====
+const HF_API_KEY = process.env.HF_API_KEY;
+const HF_ENDPOINT = "https://router.huggingface.co/v1/chat/completions";
+const MODEL_NAME = "openai/gpt-oss-120b";
+
+// ===== MIDDLEWARE =====
+app.use(cors());
+app.use(express.json());
+
+// ===== HEALTH CHECK =====
+app.get("/", (req, res) => {
+  res.json({ status: "ok", service: "mock-ai-api" });
+});
+
+// ===== MAIN ENDPOINT =====
 app.post("/test-agent", async (req, res) => {
   try {
     const { prompt, stream = false } = req.body;
@@ -18,13 +39,8 @@ app.post("/test-agent", async (req, res) => {
       body: JSON.stringify({
         model: MODEL_NAME,
         messages: [
-          {
-            role: "system",
-            content: "You are a helpful assistant. Give short, concise answers in 2-3 sentences."
-          },
           { role: "user", content: prompt }
         ],
-        max_new_tokens: 150,
         stream: false
       })
     });
@@ -62,4 +78,9 @@ app.post("/test-agent", async (req, res) => {
       response: "Sorry, something went wrong on the server."
     });
   }
+});
+
+// ===== START SERVER =====
+app.listen(PORT, () => {
+  console.log(`🚀 Mock AI API running on port ${PORT}`);
 });
