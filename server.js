@@ -18,51 +18,36 @@ app.get("/", (req, res) => {
   res.json({ status: "ok", service: "mock-ai-api" });
 });
 
-// ===== MAIN ENDPOINT =====
+// ===== MAIN CHAT ENDPOINT =====
 app.post("/test-agent", async (req, res) => {
   try {
-    const { prompt, stream = false, length = "short" } = req.body;
+    const { messages, stream = false } = req.body;
 
-    if (!prompt || typeof prompt !== "string") {
+    // Validate input
+    if (!Array.isArray(messages) || messages.length === 0) {
       return res.status(400).json({
         error: "Invalid request",
-        message: "prompt is required and must be a string"
+        message: "messages must be a non-empty array"
       });
     }
 
-    // Decide system instruction based on requested length
-    let systemInstruction;
-
-    switch (length.toLowerCase()) {
-      case "short":
-        systemInstruction =
-          "You are a helpful assistant. Provide short, concise answers in 2-3 sentences.";
-        break;
-      case "medium":
-        systemInstruction =
-          "You are a helpful assistant. Provide clear, medium-length answers in a short paragraph.";
-        break;
-      case "long":
-        systemInstruction =
-          "You are a helpful assistant. Provide detailed, thorough explanations with examples.";
-        break;
-      default:
-        systemInstruction =
-          "You are a helpful assistant. Provide short, concise answers in 2-3 sentences.";
-    }
+    // System instruction to control behavior
+    const systemMessage = {
+      role: "system",
+      content:
+        "You are a helpful assistant. Keep answers short, clear, and to the point. " +
+        "If the user asks a follow-up like 'and Mumbai', assume the same topic as before."
+    };
 
     const hfResponse = await fetch(HF_ENDPOINT, {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${HF_API_KEY}`,
+        Authorization: `Bearer ${HF_API_KEY}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: MODEL_NAME,
-        messages: [
-          { role: "system", content: systemInstruction },
-          { role: "user", content: prompt }
-        ],
+        messages: [systemMessage, ...messages],
         stream: false
       })
     });
@@ -73,30 +58,27 @@ app.post("/test-agent", async (req, res) => {
 
       return res.status(502).json({
         requestId: Date.now().toString(),
-        prompt,
-        stream,
-        response: "Sorry, I couldn't generate a response right now."
+        response: "AI service is temporarily unavailable."
       });
     }
 
     const data = await hfResponse.json();
 
     const aiMessage =
-      data?.choices?.[0]?.message?.content ??
+      data?.choices?.[0]?.message?.content ||
       "Sorry, I couldn't generate a response.";
 
     res.json({
       requestId: Date.now().toString(),
-      prompt,
-      stream,
       response: aiMessage
     });
+
   } catch (err) {
     console.error("Server error:", err);
 
     res.status(500).json({
       requestId: Date.now().toString(),
-      response: "Sorry, something went wrong on the server."
+      response: "Server error occurred."
     });
   }
 });
